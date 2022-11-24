@@ -8,11 +8,12 @@ FASTLED_USING_NAMESPACE
 #define BRIGHTNESS  100
 CRGB leds[NUM_LEDS];
 
-#define SERIAL_BAUD_RATE 9600
+#define SERIAL_BAUD_RATE 115200
 
 #define VALUES_PER_LED 4
+#define LED_PER_SHOW 3
 
-#define BUFFER_SIZE VALUES_PER_LED
+#define BUFFER_SIZE VALUES_PER_LED*LED_PER_SHOW
 byte buff[BUFFER_SIZE];
 
 
@@ -21,7 +22,7 @@ void setup() {
 
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
-  // FastLED.setMaxRefreshRate(0, false);  // turn OFF the refresh rate constraint
+  FastLED.setMaxRefreshRate(0, false);  // turn OFF the refresh rate constraint
 }
 
 void loop() {
@@ -33,10 +34,12 @@ void loop() {
   {
     Serial.readBytes(buff, BUFFER_SIZE);
 
-    leds[int(buff[0])].r = int(buff[1]);
-    leds[int(buff[0])].g = int(buff[2]);
-    leds[int(buff[0])].b = int(buff[3]);
-
+    for(int i=0; i<BUFFER_SIZE; i+=VALUES_PER_LED)
+    {
+      leds[int(buff[i])].r = int(buff[i+1]);
+      leds[int(buff[i])].g = int(buff[i+2]);
+      leds[int(buff[i])].b = int(buff[i+3]);
+    }
     FastLED.show();
   }
 }
