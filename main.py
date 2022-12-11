@@ -1,9 +1,10 @@
 """
 TODO:
 1. auto find specific arduino (serial COM)
-2. threading
-3. commenting
+2. commenting
     a. tests shows that grab(region) isn't faster the grab and slicing...(mostly slower!)
+    b. FastLED.show() is the issue (WS281x LEDs)
+    c. Algo improvements? can calc statistics of LEDs skipped
 
 Testing colors : http://color.aurlien.net/
 Cool video for showoff: https://www.youtube.com/watch?v=74TAV9rnU10&list=RD74TAV9rnU10&start_radio=1&ab_channel=EugeneBelsky
@@ -16,7 +17,6 @@ import serial                       # pyserial
 import serial.tools.list_ports
 import time
 import dxcam
-from threading import Thread
 
 
 class LedsControl:
@@ -212,14 +212,13 @@ class LedsControl:
         old_screenshot = ""
         while True:
             for led_index in range(len(self.win_list)):
-                if not led_index % 20:
-                    screenshot = self.camera.grab()
-                    # if screenshot is None:
-                    #     continue
-                    if screenshot is not None:
-                        old_screenshot = screenshot
-                    else:
-                        screenshot = old_screenshot
+                # TODO: Decrease screenshots taken by PC
+                # if not led_index % 20:
+                screenshot = self.camera.grab()
+                if screenshot is not None:
+                    old_screenshot = screenshot
+                else:
+                    screenshot = old_screenshot
 
                 win = screenshot[self.win_list[led_index][1]:self.win_list[led_index][3],
                       self.win_list[led_index][0]:self.win_list[led_index][2], :]
@@ -236,74 +235,6 @@ class LedsControl:
                     old_data[led_index] = data[1:]
                     self.serial_obj.write_serial(data)
                     time.sleep(self.delay_serial)
-
-    # Threading
-    def loop_calc_send_side(self, side):
-        cnt = 0
-        for s in self.order_list:
-            if s in ["T", "B"]:
-                if s == side:
-                    indices = [cnt, cnt + self.led_count_w]
-                    self.handle_indices(indices)
-                cnt += self.led_count_w
-            elif s in ["R", "L"]:
-                if s == side:
-                    indices = [cnt, cnt + self.led_count_h]
-                    self.handle_indices(indices)
-                cnt += self.led_count_h
-
-    def handle_indices(self, indices):
-        old_data = [[-1] * self.values_per_led] * len(self.win_list)
-        while True:
-            for led_index in range(*indices):
-                win = self.screenshot[self.win_list[led_index][1]:self.win_list[led_index][3],
-                      self.win_list[led_index][0]:self.win_list[led_index][2], :]
-
-                # # Mean Value
-                data = [led_index, *np.average(win, axis=(0, 1)).astype(np.uint8)]
-
-                # Median Value
-                # data = [led_index, *np.median(win, axis=(0, 1)).astype(np.uint8)]
-
-                # Only update if color has changed, more than given tolerance
-                # if not ((np.add(old_data[led_index], self.led_tol_list[:3]) > data[1:]).all() and
-                #         (np.add(old_data[led_index], self.led_tol_list[3:]) < data[1:]).all()):
-                #
-                #         old_data[led_index] = data[1:]
-
-                # Run over old value if exists in queue
-                temp_list = [sublist[0] for sublist in self.data_list]
-                if data[0] in temp_list:
-                    self.data_list[temp_list.index(data[0])] = data
-                else:
-                    self.data_list.append(data)
-
-    def cam_threaded(self):
-        old_screenshot = None
-        while True:
-            self.screenshot = self.camera.grab()
-            if self.screenshot is not None:
-                old_screenshot = self.screenshot
-            else:
-                self.screenshot = old_screenshot
-
-    def com_threaded(self):
-        while True:
-            if self.data_list:
-                self.serial_obj.write_serial(self.data_list.pop(0))
-                time.sleep(self.delay_serial)
-
-    def run_threads(self):
-        thread_cam = Thread(target=self.cam_threaded)
-        thread_cam.start()
-        time.sleep(0.01)
-
-        for side in self.order_list:
-            thread_leds = Thread(target=self.loop_calc_send_side, kwargs={'side': side})
-            thread_leds.start()
-
-        thread_com = Thread(target=self.com_threaded)
-        thread_com.start()
 
 
 class SerialCom:
@@ -342,13 +273,14 @@ class SerialCom:
 
 
 if __name__ == '__main__':
+
     # user params #
     user_baud_rate = 115200
     user_delay_serial = 0.004
     user_led_count_height = 17
     user_led_count_width = 33
     user_zeroth_led_position = "BL"
-    user_led_update_tolerance = 15
+    user_led_update_tolerance = 5
     ###############
 
     leds_control = LedsControl()
@@ -362,20 +294,4 @@ if __name__ == '__main__':
     # leds_control.example_windows(show_windows=True, show_frame=True)
     time.sleep(2)
 
-    # leds_control.loop_calc_send_values()
-    leds_control.run_threads()
-
-
-# Options:
-# overall:
-# a. baud rate?..
-
-# arduino
-# a. FastLED.show() for each LED_PER_SHOW leds
-
-# python
-# a. loop_calc_send_values()
-# b. run_threads(), in com_threaded() consider delay
-# c. screenshot for every led or every cycle? every n leds?
-# d. very slow!:
-#      if not ((np.add(old_data[led_index], self.led_tol_list[:3]) > data[1:]).all() and (np.add(old_data[led_index], self.led_tol_list[3:]) < data[1:]).all()):
+    leds_control.loop_calc_send_values()

@@ -5,7 +5,7 @@ FASTLED_USING_NAMESPACE
 #define LED_TYPE    WS2811
 #define COLOR_ORDER GRB
 #define NUM_LEDS    100
-#define BRIGHTNESS  100
+#define BRIGHTNESS  255
 CRGB leds[NUM_LEDS];
 
 #define SERIAL_BAUD_RATE 115200
@@ -16,7 +16,6 @@ CRGB leds[NUM_LEDS];
 #define BUFFER_SIZE VALUES_PER_LED*LED_PER_SHOW
 byte buff[BUFFER_SIZE];
 
-
 void setup() {
   Serial.begin(SERIAL_BAUD_RATE);
 
@@ -26,10 +25,6 @@ void setup() {
 }
 
 void loop() {
-  // int brightness = analogRead(pot_pin);
-  // map potentiometer value to 0-255
-  // FastLED.setBrightness(brightness);
-
   if (Serial.available())
   {
     Serial.readBytes(buff, BUFFER_SIZE);
